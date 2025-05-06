@@ -1,0 +1,18 @@
+[Unit]
+Description=OLED ADS-B status driver
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=60
+User=pi
+StandardError=journal
+StandardOutput=journal
+StandardInput=null
+WorkingDirectory=/home/pi/git/88nv_oled/
+ExecStart=/home/pi/git/88nv_oled/bin/python3 /home/pi/git/88nv_oled/monitor.py --detail=mesh --file=/home/pi/mesh_adsb/tracker_stats.json
+
+[Install]
+WantedBy=multi-user.target
