@@ -146,7 +146,7 @@ def write_sysstat(drawobj):
             cached_memory = meminfo["Cached"]
             available_memory = free_memory + cached_memory
 
-            available_memory_pct = 100 - (available_memory / total_memory) * 100
+            available_memory_pct = (available_memory / total_memory) * 100
     except Exception:
         cpu_load = "None"
         iowait = "None"
