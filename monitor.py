@@ -116,8 +116,9 @@ def write_mesh_data(drawobj, fn):
         writeline(drawobj, 2 + line_num, writestr)
 
 def write_sysstat(drawobj):
-    # get the disk iowait and cpu load for the last 1 second
+    # get the disk iowait, cpu load, and memory pressure
     try:
+        # CPU stats
         with open("/proc/stat") as fd:
             lines = fd.readlines()
             cpu_line_1 = lines[0].split()
@@ -132,11 +133,28 @@ def write_sysstat(drawobj):
 
             cpu_load = 100 - (idle_diff / total_diff) * 100
             iowait = (cpu_diff[4] / total_diff) * 100  # iowait is the 5th column
+
+        # Memory stats
+        with open("/proc/meminfo") as fd:
+            meminfo = {}
+            for line in fd:
+                key, value = line.split(":")
+                meminfo[key.strip()] = int(value.split()[0])  # Value is in kB
+
+            total_memory = meminfo["MemTotal"]
+            free_memory = meminfo["MemFree"]
+            cached_memory = meminfo["Cached"]
+            available_memory = free_memory + cached_memory
+
+            available_memory_pct = 100 - (available_memory / total_memory) * 100
     except Exception:
         cpu_load = "None"
         iowait = "None"
+        available_memory_pct = "None"
+
     writeline(drawobj, 2, f"CPU load: {cpu_load:.1f}%")
     writeline(drawobj, 3, f"IOwait: {iowait:.1f}%")
+    writeline(drawobj, 4, f"Avail memory: {available_memory_pct:.1f}%")
 
 if __name__ == "__main__":
     # Parse command line arguments for --mode
