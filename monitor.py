@@ -116,13 +116,22 @@ def write_mesh_data(drawobj, fn):
         writeline(drawobj, 2 + line_num, writestr)
 
 def write_sysstat(drawobj):
-    # get the disk iowait and cpu load
+    # get the disk iowait and cpu load for the last 1 second
     try:
         with open("/proc/stat") as fd:
             lines = fd.readlines()
-            cpu_line = lines[0].split()
-            cpu_load = 100 - (int(cpu_line[4]) / sum(map(int, cpu_line[1:]))) * 100
-            iowait = int(cpu_line[5]) / sum(map(int, cpu_line[1:])) * 100
+            cpu_line_1 = lines[0].split()
+            time.sleep(1)  # Wait for 1 second to calculate recent stats
+            fd.seek(0)
+            lines = fd.readlines()
+            cpu_line_2 = lines[0].split()
+
+            cpu_diff = [int(cpu_line_2[i]) - int(cpu_line_1[i]) for i in range(1, len(cpu_line_1))]
+            total_diff = sum(cpu_diff)
+            idle_diff = cpu_diff[3]  # idle time is the 4th column
+
+            cpu_load = 100 - (idle_diff / total_diff) * 100
+            iowait = (cpu_diff[4] / total_diff) * 100  # iowait is the 5th column
     except Exception:
         cpu_load = "None"
         iowait = "None"
