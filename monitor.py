@@ -132,7 +132,7 @@ def write_sysstat(drawobj):
 if __name__ == "__main__":
     # Parse command line arguments for --mode
     parser = argparse.ArgumentParser(description="Monitor script for OLED display.")
-    parser.add_argument("--detail", choices=["adsb", "mesh"],
+    parser.add_argument("--detail", choices=["adsb", "mesh", "sysstat"], default="sysstat",
                         help="Set detail information to show. Options: 'adsb', 'mesh'.")
     parser.add_argument("--file", type=str, default=TRACKER_STATS_FILE)
     args = parser.parse_args()
