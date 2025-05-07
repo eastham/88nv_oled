@@ -4,12 +4,10 @@ import logging
 import time
 import os
 import threading
-import RPi.GPIO as GPIO
 import adafruit_ssd1306
 from PIL import ImageFont, Image, ImageDraw
 from netifaces import interfaces, ifaddresses, AF_INET
 from board import SCL, SDA
-from tracker_stats import TrackerQueue
 import adafruit_ssd1306
 import busio
 import sys
@@ -51,10 +49,6 @@ def getrssi():
 
 def getwlanip():
     return [i['addr'] for i in ifaddresses("wlan0").setdefault(AF_INET, [{'addr':'No IP addr'}] )][0]
-
-def pinsetup():
-    GPIO.setwarnings(False)
-    GPIO.setmode(GPIO.BCM)
 
 def screensetup():
     global font
@@ -109,6 +103,8 @@ def write_adsb_data(drawobj):
     writeline(drawobj, 4, writestr)
 
 def write_mesh_data(drawobj, fn):
+    from tracker_stats import TrackerQueue
+
     tq = TrackerQueue(100)
     tq.load_from_file(fn)
 
@@ -119,6 +115,20 @@ def write_mesh_data(drawobj, fn):
         writestr = " - ".join(entries[line_num * 3:(line_num + 1) * 3])
         writeline(drawobj, 2 + line_num, writestr)
 
+def write_sysstat(drawobj):
+    # get the disk iowait and cpu load
+    try:
+        with open("/proc/stat") as fd:
+            lines = fd.readlines()
+            cpu_line = lines[0].split()
+            cpu_load = 100 - (int(cpu_line[4]) / sum(map(int, cpu_line[1:]))) * 100
+            iowait = int(cpu_line[5]) / sum(map(int, cpu_line[1:])) * 100
+    except Exception:
+        cpu_load = "None"
+        iowait = "None"
+    writeline(drawobj, 2, f"CPU load: {cpu_load:.1f}%")
+    writeline(drawobj, 3, f"IOwait: {iowait:.1f}%")
+
 if __name__ == "__main__":
     # Parse command line arguments for --mode
     parser = argparse.ArgumentParser(description="Monitor script for OLED display.")
@@ -127,7 +137,6 @@ if __name__ == "__main__":
     parser.add_argument("--file", type=str, default=TRACKER_STATS_FILE)
     args = parser.parse_args()
 
-    pinsetup()
     draw, image, disp = screensetup()
     clearscreen(draw)
     writeline(draw, 0, "Booting...")
@@ -148,6 +157,8 @@ if __name__ == "__main__":
                 write_adsb_data(draw)
             elif args.detail == "mesh":
                 write_mesh_data(draw, args.file)
+            elif args.detail == "sysstat":
+                write_sysstat(draw)
             else:
                 writeline(draw, 1, "No detail mode selected")
 
