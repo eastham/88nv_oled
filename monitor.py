@@ -23,10 +23,8 @@ TRACKER_STATS_FILE = "tracker_stats.json"
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-logger.debug("Logging is set up.")
 
 font = False
-booted = False
 resetlock = threading.Lock()
 displaylock = threading.Lock()
 
@@ -152,49 +150,67 @@ def write_sysstat(drawobj):
         iowait = "None"
         available_memory_pct = "None"
 
-    writeline(drawobj, 2, f"CPU load: {cpu_load:.1f}%")
-    writeline(drawobj, 3, f"IOwait: {iowait:.1f}%")
-    writeline(drawobj, 4, f"Avail memory: {available_memory_pct:.1f}%")
+    writeline(drawobj, 2, f"CPU load: {int(cpu_load)}%")
+    writeline(drawobj, 3, f"IOwait: {int(iowait)}%")
+    writeline(drawobj, 4, f"Avail memory: {int(available_memory_pct)}%")
 
-if __name__ == "__main__":
-    # Parse command line arguments for --mode
-    parser = argparse.ArgumentParser(description="Monitor script for OLED display.")
-    parser.add_argument("--detail", choices=["adsb", "mesh", "sysstat"], default="sysstat",
-                        help="Set detail information to show. Options: 'adsb', 'mesh'.")
-    parser.add_argument("--file", type=str, default=TRACKER_STATS_FILE)
-    args = parser.parse_args()
-
-    draw, image, disp = screensetup()
+def main_loop(detail_modes, draw, image, disp, args):
     clearscreen(draw)
     writeline(draw, 0, "Booting...")
     showtext(disp, image)
 
-    booted = True
-    spinarr="|/-\\|/-\\"
-    spinoff=0
+    SPINARR = "|/-\\|/-\\"
+    spin_index = 0
     temp = gettemp()
+    mode_index = 0
 
     while True:
+        current_mode = detail_modes[mode_index]
+
         with displaylock:
             clearscreen(draw)
 
             writeline(draw, 0, f"IP: {getwlanip()}")
 
-            if args.detail == "adsb":
+            # Rotate through selected detail modes every 5th loop
+            if current_mode == "adsb":
                 write_adsb_data(draw)
-            elif args.detail == "mesh":
+            elif current_mode == "mesh":
                 write_mesh_data(draw, args.file)
-            elif args.detail == "sysstat":
+            elif current_mode == "sysstat":
                 write_sysstat(draw)
-            else:
-                writeline(draw, 1, "No detail mode selected")
 
-            if spinoff == len(spinarr):
-                spinoff = 0
+            # Update mode index every 5th loop
+            if spin_index % 5 == 0:
+                mode_index = (mode_index + 1) % len(detail_modes)
+
+            if spin_index == len(SPINARR):
+                spin_index = 0
                 temp = gettemp()
-            writestr = f"Temp: {temp:.1f}    {spinarr[spinoff]}"
-            spinoff += 1
+            writestr = f"Temp: {temp:.1f}    {SPINARR[spin_index]}"
+            spin_index += 1
             writeline(draw, 6, writestr)
             showtext(disp, image)
 
-        time.sleep(1)
+        if current_mode != "sysstat":  # sysstat has its own sleep
+            time.sleep(1)
+
+
+if __name__ == "__main__":
+    # Parse command line arguments for --mode
+    parser = argparse.ArgumentParser(description="Monitor script for OLED display.")
+    parser.add_argument("--detail", type=str, default="sysstat",
+                        help="Set detail information to show. Options: 'adsb', 'mesh', 'sysstat'. "
+                                "Provide a comma-separated list to rotate through multiple options.")
+    parser.add_argument("--file", type=str, default=TRACKER_STATS_FILE, help="file to read mesh data from")
+    args = parser.parse_args()
+
+    # Parse the --detail argument into a list of modes
+    detail_modes = args.detail.split(",")
+    valid_modes = {"adsb", "mesh", "sysstat"}
+    detail_modes = [mode for mode in detail_modes if mode in valid_modes]
+    if not detail_modes:
+        raise ValueError("No valid detail modes provided. Use 'adsb', 'mesh', and/or 'sysstat'.")
+
+    draw, image, disp = screensetup()
+    main_loop(detail_modes, draw, image, disp, args)
